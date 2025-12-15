@@ -32,6 +32,7 @@ jobs:
           fuser -k 5000/tcp || true
           fuser -k 5001/tcp || true
           fuser -k 5002/tcp || true
+          fuser -k 5005/tcp || true
           
           # Tunggu 3 detik agar OS benar-benar melepas port (TIME_WAIT state)
           sleep 3
