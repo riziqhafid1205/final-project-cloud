@@ -3,7 +3,7 @@ name: Deploy to Huawei Cloud
 on:
   push:
     branches:
-      - main  # Robot bekerja otomatis saat ada push
+      - main  # Pipeline berjalan otomatis setiap ada update ke main
 
 jobs:
   deploy:
@@ -21,39 +21,50 @@ jobs:
         key: ${{ secrets.SSH_KEY }}
         port: 22
         script: |
-          # 1. Masuk Folder
+          # --- 1. PERSIAPAN ---
+          echo "🚀 Memulai Deployment..."
           cd /root/riziq
-
-          # 2. Tarik Kode Baru
+          
+          # Tarik kode terbaru dari GitHub
           git pull origin main
 
-          # 3. AUTO-CLEANUP (Bagian Paling Penting!)
-          # Ini akan membunuh proses yang bikin error "Address already in use"
-          echo "Mematikan port lama..."
-          fuser -k 5000/tcp || true
-          fuser -k 5001/tcp || true
-          fuser -k 5002/tcp || true
-          fuser -k 5005/tcp || true
+          # --- 2. BERSIH-BERSIH (PENTING) ---
+          # Mematikan proses lama agar port tidak bentrok.
+          # '|| true' menjamin proses lanjut meski port sudah kosong.
+          echo "🧹 Membersihkan port lama..."
+          fuser -k 5000/tcp || true  # Port Nginx/Flask Default
+          fuser -k 5001/tcp || true  # Port Server 1 (Fiksi)
+          fuser -k 5002/tcp || true  # Port Server 2 (Jurnal)
+          fuser -k 5005/tcp || true  # Port Gateway
           
-          # Jeda napas agar port benar-benar lepas
+          # Matikan sisa proses python jika masih membandel
+          pkill python3 || true
+          
+          # Jeda 3 detik untuk memastikan semua benar-benar mati
           sleep 3
 
-          # 4. Install Dependencies
+          # --- 3. INSTALLASI ---
+          echo "📦 Update Library..."
           pip3 install -r requirements.txt || true
 
-          # 5. Nyalakan Ulang Semua Server
-          echo "Menyalakan server..."
-          # Server 1 (Fiksi) di Port 5001
+          # --- 4. START APLIKASI ---
+          echo "🔥 Menyalakan Server..."
+          
+          # Server 1 (Fiksi) - Wajib jalan di Port 5001
           nohup python3 server1.py > server1.log 2>&1 &
-          # Server 2 (Jurnal) di Port 5002
+          
+          # Server 2 (Jurnal) - Wajib jalan di Port 5002
           nohup python3 server2.py > server2.log 2>&1 &
-          # Gateway di Port 5005
+          
+          # Gateway - Wajib jalan di Port 5005
           nohup python3 gateway.py > gateway.log 2>&1 &
 
-          # 6. Restart Nginx (Agar 502 Bad Gateway hilang)
-          echo "Restarting Nginx..."
-          systemctl restart nginx
+          # --- 5. RESTART NGINX ---
+          # Restart Nginx agar koneksi ulang ke Gateway lancar
+          echo "🔄 Restart Nginx..."
+          sudo systemctl restart nginx
 
-          # 7. Cek Status
+          # --- 6. CEK HASIL ---
+          echo "✅ Deployment Selesai. Cek status proses:"
           sleep 2
           ps aux | grep python3
