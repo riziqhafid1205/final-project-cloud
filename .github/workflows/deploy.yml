@@ -21,12 +21,29 @@ jobs:
         key: ${{ secrets.SSH_KEY }}
         port: 22
         script: |
+          # 1. Masuk ke folder project
           cd /root/riziq
+
+          # 2. Tarik kode terbaru
           git pull origin main
-          pkill python3 || true
+
+          # 3. CLEAN UP PORTS (Hanya matikan port milik Anda sendiri)
+          # "|| true" agar script tidak error/berhenti jika port memang sedang kosong
+          fuser -k 5000/tcp || true
+          fuser -k 5001/tcp || true
+          fuser -k 5002/tcp || true
+          
+          # Tunggu 3 detik agar OS benar-benar melepas port (TIME_WAIT state)
+          sleep 3
+
+          # 4. Install library (jaga-jaga)
           pip3 install -r requirements.txt || true
+
+          # 5. Nyalakan kembali server (Gunakan nohup agar jalan di background)
           nohup python3 server1.py > server1.log 2>&1 &
           nohup python3 server2.py > server2.log 2>&1 &
           nohup python3 gateway.py > gateway.log 2>&1 &
+          
+          # 6. Verifikasi
           sleep 2
           ps aux | grep python3
