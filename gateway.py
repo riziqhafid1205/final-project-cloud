@@ -5,13 +5,11 @@ import requests
 app = Flask(__name__)
 CORS(app)
 
-# URL Server Internal (Tetap HTTP karena satu mesin di localhost)
 SERVER_1_URL = "http://127.0.0.1:5001/fiksi"
 SERVER_2_URL = "http://127.0.0.1:5002/jurnal"
 
 @app.route('/', methods=['GET'])
 def index():
-    # PERUBAHAN DI SINI: Pesan ini membuktikan bahwa CI/CD sukses mengupdate server
     return jsonify({"message": "Sistem Microservices Final - Stabil"})
 
 @app.route('/api/all-products', methods=['GET'])
@@ -19,7 +17,6 @@ def get_all_products():
     combined_data = []
     status_report = {}
 
-    # --- AMBIL DATA SERVER 1 (FIKSI) ---
     try:
         response1 = requests.get(SERVER_1_URL, timeout=2)
         if response1.status_code == 200:
@@ -34,7 +31,6 @@ def get_all_products():
         print(f"Server 1 Error: {e}")
         status_report['server_1'] = 'Offline/Down'
 
-    # --- AMBIL DATA SERVER 2 (JURNAL) ---
     try:
         response2 = requests.get(SERVER_2_URL, timeout=2)
         if response2.status_code == 200:
@@ -49,13 +45,10 @@ def get_all_products():
         print(f"Server 2 Error: {e}")
         status_report['server_2'] = 'Offline/Down'
 
-    # Kembalikan gabungan data
     return jsonify({
         "status": status_report,
         "data": combined_data
     })
 
 if __name__ == '__main__':
-    # PENTING: Jalankan di HTTP Port 5000.
-    # Jangan pakai SSL di sini, karena Nginx di depan sudah pakai SSL (HTTPS).
     app.run(host='0.0.0.0', port=5005)
