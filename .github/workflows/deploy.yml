@@ -3,7 +3,7 @@ name: Deploy to Huawei Cloud
 on:
   push:
     branches:
-      - main  # Pipeline berjalan otomatis setiap ada update ke main
+      - main  # Pipeline jalan otomatis setiap ada update ke branch main
 
 jobs:
   deploy:
@@ -20,6 +20,8 @@ jobs:
         username: ${{ secrets.USERNAME }}
         key: ${{ secrets.SSH_KEY }}
         port: 22
+        # Menghindari error "Host key verification failed" saat ganti kunci
+        command_timeout: 20m
         script: |
           # --- 1. PERSIAPAN ---
           echo "🚀 Memulai Deployment..."
@@ -28,43 +30,45 @@ jobs:
           # Tarik kode terbaru dari GitHub
           git pull origin main
 
-          # --- 2. BERSIH-BERSIH (PENTING) ---
-          # Mematikan proses lama agar port tidak bentrok.
-          # '|| true' menjamin proses lanjut meski port sudah kosong.
+          # --- 2. BERSIH-BERSIH PORT (CRITICAL STEP) ---
+          # Mematikan paksa siapapun yang memakai port ini.
+          # '|| true' artinya: "Kalau error/kosong, lanjut saja, jangan berhenti!"
           echo "🧹 Membersihkan port lama..."
-          fuser -k 5000/tcp || true  # Port Nginx/Flask Default
+          fuser -k 5000/tcp || true  # Port Nginx/Default Flask
           fuser -k 5001/tcp || true  # Port Server 1 (Fiksi)
           fuser -k 5002/tcp || true  # Port Server 2 (Jurnal)
           fuser -k 5005/tcp || true  # Port Gateway
           
-          # Matikan sisa proses python jika masih membandel
+          # Cadangan: Matikan semua python jika fuser gagal
           pkill python3 || true
           
-          # Jeda 3 detik untuk memastikan semua benar-benar mati
-          sleep 3
+          # Beri waktu 5 detik agar sistem benar-benar membunuh proses
+          sleep 5
 
-          # --- 3. INSTALLASI ---
+          # --- 3. INSTALL DEPENDENCIES ---
           echo "📦 Update Library..."
           pip3 install -r requirements.txt || true
 
-          # --- 4. START APLIKASI ---
+          # --- 4. START SERVERS ---
           echo "🔥 Menyalakan Server..."
           
-          # Server 1 (Fiksi) - Wajib jalan di Port 5001
+          # Nyalakan Server 1 (Fiksi) di Port 5001
           nohup python3 server1.py > server1.log 2>&1 &
           
-          # Server 2 (Jurnal) - Wajib jalan di Port 5002
+          # Nyalakan Server 2 (Jurnal) di Port 5002
           nohup python3 server2.py > server2.log 2>&1 &
           
-          # Gateway - Wajib jalan di Port 5005
+          # Nyalakan Gateway di Port 5005
           nohup python3 gateway.py > gateway.log 2>&1 &
+          
+          # Tunggu sebentar agar Python stabil
+          sleep 3
 
           # --- 5. RESTART NGINX ---
-          # Restart Nginx agar koneksi ulang ke Gateway lancar
+          # Restart Nginx agar koneksi ke Python (Gateway) refresh ulang
           echo "🔄 Restart Nginx..."
           sudo systemctl restart nginx
 
-          # --- 6. CEK HASIL ---
-          echo "✅ Deployment Selesai. Cek status proses:"
-          sleep 2
+          # --- 6. VERIFIKASI ---
+          echo "✅ Deployment Selesai. Berikut proses yang berjalan:"
           ps aux | grep python3
