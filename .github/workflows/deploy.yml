@@ -3,7 +3,7 @@ name: Deploy to Huawei Cloud
 on:
   push:
     branches:
-      - main  # Trigger otomatis saat ada push ke branch main
+      - main  # Robot bekerja otomatis saat ada push
 
 jobs:
   deploy:
@@ -21,32 +21,39 @@ jobs:
         key: ${{ secrets.SSH_KEY }}
         port: 22
         script: |
-          # 1. Masuk ke folder project
+          # 1. Masuk Folder
           cd /root/riziq
 
-          # 2. Tarik kode terbaru dari GitHub
+          # 2. Tarik Kode Baru
           git pull origin main
 
-          # 3. MATIKAN PROSES LAMA (Surgical Kill) - INI YANG ANDA CARI
-          # Perintah ini akan mematikan paksa port tanpa error jika port sudah kosong (|| true)
-          echo "Cleaning up ports..."
+          # 3. AUTO-CLEANUP (Bagian Paling Penting!)
+          # Ini akan membunuh proses yang bikin error "Address already in use"
+          echo "Mematikan port lama..."
           fuser -k 5000/tcp || true
           fuser -k 5001/tcp || true
           fuser -k 5002/tcp || true
           fuser -k 5005/tcp || true
           
-          # Beri jeda sedikit agar sistem benar-benar bersih
+          # Jeda napas agar port benar-benar lepas
           sleep 3
 
-          # 4. Install ulang dependencies (jaga-jaga ada library baru)
+          # 4. Install Dependencies
           pip3 install -r requirements.txt || true
 
-          # 5. Nyalakan Service Kembali
-          echo "Starting services..."
+          # 5. Nyalakan Ulang Semua Server
+          echo "Menyalakan server..."
+          # Server 1 (Fiksi) di Port 5001
           nohup python3 server1.py > server1.log 2>&1 &
+          # Server 2 (Jurnal) di Port 5002
           nohup python3 server2.py > server2.log 2>&1 &
+          # Gateway di Port 5005
           nohup python3 gateway.py > gateway.log 2>&1 &
-          
-          # 6. Cek status (untuk log di GitHub Actions)
+
+          # 6. Restart Nginx (Agar 502 Bad Gateway hilang)
+          echo "Restarting Nginx..."
+          systemctl restart nginx
+
+          # 7. Cek Status
           sleep 2
           ps aux | grep python3
